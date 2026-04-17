@@ -6,11 +6,17 @@ import requests
 app = Flask(__name__)
 CORS(app)
 
-# 🔑 API Key من متغيرات البيئة
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 
-# واجهة الدردشة HTML
+# ✅ الأسماء الصحيحة لنماذج Groq (محدثة 2025)
+AVAILABLE_MODELS = {
+    "llama-3.3-70b-versatile": "Llama 3.3 70B (الأقوى)",
+    "llama-3.1-8b-instant": "Llama 3.1 8B (الأسرع)",
+    "mixtral-8x7b-32768": "Mixtral 8x7B",
+    "gemma2-9b-it": "Gemma 2 9B"
+}
+
 CHAT_HTML = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -19,11 +25,7 @@ CHAT_HTML = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🤖 مساعد الذكاء الاصطناعي</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -53,15 +55,8 @@ CHAT_HTML = """
             text-align: center;
         }
         
-        .chat-header h1 {
-            font-size: 24px;
-            margin-bottom: 5px;
-        }
-        
-        .chat-header p {
-            opacity: 0.9;
-            font-size: 14px;
-        }
+        .chat-header h1 { font-size: 24px; margin-bottom: 5px; }
+        .chat-header p { opacity: 0.9; font-size: 14px; }
         
         .chat-messages {
             flex: 1;
@@ -83,9 +78,7 @@ CHAT_HTML = """
             to { opacity: 1; transform: translateY(0); }
         }
         
-        .message.user {
-            flex-direction: row-reverse;
-        }
+        .message.user { flex-direction: row-reverse; }
         
         .message-avatar {
             width: 40px;
@@ -98,13 +91,8 @@ CHAT_HTML = """
             flex-shrink: 0;
         }
         
-        .message.user .message-avatar {
-            background: #667eea;
-        }
-        
-        .message.bot .message-avatar {
-            background: #28a745;
-        }
+        .message.user .message-avatar { background: #667eea; }
+        .message.bot .message-avatar { background: #28a745; }
         
         .message-content {
             max-width: 70%;
@@ -127,10 +115,7 @@ CHAT_HTML = """
             border-bottom-left-radius: 4px;
         }
         
-        .message.loading .message-content {
-            background: #f0f0f0;
-            color: #666;
-        }
+        .message.loading .message-content { background: #f0f0f0; color: #666; }
         
         .typing-indicator {
             display: flex;
@@ -160,10 +145,7 @@ CHAT_HTML = """
             border-top: 1px solid #e0e0e0;
         }
         
-        .chat-input-wrapper {
-            display: flex;
-            gap: 10px;
-        }
+        .chat-input-wrapper { display: flex; gap: 10px; }
         
         #messageInput {
             flex: 1;
@@ -175,9 +157,7 @@ CHAT_HTML = """
             transition: border-color 0.3s;
         }
         
-        #messageInput:focus {
-            border-color: #667eea;
-        }
+        #messageInput:focus { border-color: #667eea; }
         
         #sendButton {
             padding: 15px 30px;
@@ -195,10 +175,7 @@ CHAT_HTML = """
             box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
         }
         
-        #sendButton:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
+        #sendButton:disabled { opacity: 0.6; cursor: not-allowed; }
         
         .model-selector {
             padding: 10px 20px;
@@ -210,9 +187,7 @@ CHAT_HTML = """
             font-size: 14px;
         }
         
-        .model-selector label {
-            color: #666;
-        }
+        .model-selector label { color: #666; }
         
         .model-selector select {
             padding: 5px 10px;
@@ -228,34 +203,14 @@ CHAT_HTML = """
             color: #666;
         }
         
-        .welcome-message h2 {
-            color: #667eea;
-            margin-bottom: 10px;
-        }
+        .welcome-message h2 { color: #667eea; margin-bottom: 10px; }
         
-        .error-message {
-            background: #fee !important;
-            color: #c33 !important;
-            border-color: #fcc !important;
-        }
+        .error-message { background: #fee !important; color: #c33 !important; border-color: #fcc !important; }
         
-        /* شريط التمرير */
-        .chat-messages::-webkit-scrollbar {
-            width: 8px;
-        }
-        
-        .chat-messages::-webkit-scrollbar-track {
-            background: #f1f1f1;
-        }
-        
-        .chat-messages::-webkit-scrollbar-thumb {
-            background: #c1c1c1;
-            border-radius: 4px;
-        }
-        
-        .chat-messages::-webkit-scrollbar-thumb:hover {
-            background: #a1a1a1;
-        }
+        .chat-messages::-webkit-scrollbar { width: 8px; }
+        .chat-messages::-webkit-scrollbar-track { background: #f1f1f1; }
+        .chat-messages::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+        .chat-messages::-webkit-scrollbar-thumb:hover { background: #a1a1a1; }
     </style>
 </head>
 <body>
@@ -275,7 +230,7 @@ CHAT_HTML = """
         <div class="model-selector">
             <label>🧠 النموذج:</label>
             <select id="modelSelect">
-                <option value="llama-3.1-70b-versatile">Llama 3.1 70B (الأقوى)</option>
+                <option value="llama-3.3-70b-versatile">Llama 3.3 70B (الأقوى)</option>
                 <option value="llama-3.1-8b-instant">Llama 3.1 8B (الأسرع)</option>
                 <option value="mixtral-8x7b-32768">Mixtral 8x7B</option>
                 <option value="gemma2-9b-it">Gemma 2 9B</option>
@@ -284,12 +239,7 @@ CHAT_HTML = """
         
         <div class="chat-input-container">
             <div class="chat-input-wrapper">
-                <input 
-                    type="text" 
-                    id="messageInput" 
-                    placeholder="اكتب رسالتك هنا..." 
-                    autocomplete="off"
-                >
+                <input type="text" id="messageInput" placeholder="اكتب رسالتك هنا..." autocomplete="off">
                 <button id="sendButton">إرسال</button>
             </div>
         </div>
@@ -303,12 +253,9 @@ CHAT_HTML = """
         
         let isLoading = false;
         
-        // إضافة رسالة للشات
         function addMessage(text, sender, isError = false) {
             const welcomeMessage = document.querySelector('.welcome-message');
-            if (welcomeMessage) {
-                welcomeMessage.remove();
-            }
+            if (welcomeMessage) welcomeMessage.remove();
             
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${sender}`;
@@ -325,11 +272,9 @@ CHAT_HTML = """
             messageDiv.appendChild(avatar);
             messageDiv.appendChild(content);
             chatMessages.appendChild(messageDiv);
-            
             scrollToBottom();
         }
         
-        // إضافة مؤشر الكتابة
         function addTypingIndicator() {
             const messageDiv = document.createElement('div');
             messageDiv.className = 'message bot loading';
@@ -341,43 +286,31 @@ CHAT_HTML = """
             
             const content = document.createElement('div');
             content.className = 'message-content';
-            content.innerHTML = `
-                <div class="typing-indicator">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                </div>
-            `;
+            content.innerHTML = '<div class="typing-indicator"><span></span><span></span><span></span></div>';
             
             messageDiv.appendChild(avatar);
             messageDiv.appendChild(content);
             chatMessages.appendChild(messageDiv);
-            
             scrollToBottom();
         }
         
-        // إزالة مؤشر الكتابة
         function removeTypingIndicator() {
             const indicator = document.getElementById('typingIndicator');
             if (indicator) indicator.remove();
         }
         
-        // التمرير للأسفل
         function scrollToBottom() {
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
         
-        // إرسال الرسالة
         async function sendMessage() {
             const text = messageInput.value.trim();
             if (!text || isLoading) return;
             
-            // إضافة رسالة المستخدم
             addMessage(text, 'user');
             messageInput.value = '';
             messageInput.focus();
             
-            // مؤشر الكتابة
             isLoading = true;
             sendButton.disabled = true;
             addTypingIndicator();
@@ -385,9 +318,7 @@ CHAT_HTML = """
             try {
                 const response = await fetch('/api/chat', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         message: text,
                         model: modelSelect.value
@@ -402,26 +333,19 @@ CHAT_HTML = """
                 } else {
                     addMessage(data.response, 'bot');
                 }
-                
             } catch (error) {
                 removeTypingIndicator();
-                addMessage('❌ حدث خطأ في الاتصال. حاول مرة أخرى.', 'bot', true);
+                addMessage('❌ حدث خطأ في الاتصال', 'bot', true);
             }
             
             isLoading = false;
             sendButton.disabled = false;
         }
         
-        // الأحداث
         sendButton.addEventListener('click', sendMessage);
-        
         messageInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                sendMessage();
-            }
+            if (e.key === 'Enter') sendMessage();
         });
-        
-        // التركيز التلقائي
         messageInput.focus();
     </script>
 </body>
@@ -430,20 +354,24 @@ CHAT_HTML = """
 
 @app.route('/')
 def index():
-    """الصفحة الرئيسية - واجهة الدردشة"""
     return render_template_string(CHAT_HTML)
 
 @app.route('/health')
 def health():
-    """فحص الحالة"""
     return jsonify({
         "status": "✅ API يعمل",
         "groq_configured": bool(GROQ_API_KEY)
     })
 
+@app.route('/api/models')
+def get_models():
+    """الحصول على النماذج المتاحة"""
+    return jsonify({
+        "models": [{"id": k, "name": v} for k, v in AVAILABLE_MODELS.items()]
+    })
+
 @app.route('/api/chat', methods=['POST'])
 def chat():
-    """API الدردشة"""
     try:
         data = request.get_json()
         
@@ -451,16 +379,20 @@ def chat():
             return jsonify({"error": "❌ أرسل 'message' في body"}), 400
         
         user_message = data['message']
-        model = data.get('model', 'llama-3.1-70b-versatile')
+        model = data.get('model', 'llama-3.3-70b-versatile')
         
-        # وضع المحاكاة إذا لم يكن هناك API Key
+        # ✅ التحقق من صحة اسم النموذج
+        if model not in AVAILABLE_MODELS:
+            return jsonify({
+                "error": f"❌ النموذج '{model}' غير متوفر. النماذج المتاحة: {', '.join(AVAILABLE_MODELS.keys())}"
+            }), 400
+        
         if not GROQ_API_KEY:
             return jsonify({
-                "response": f"📝 (وضع المحاكاة) أنت قلت: {user_message}\n\n⚠️ أضف GROQ_API_KEY في Environment Variables",
+                "response": f"📝 (وضع المحاكاة) أنت قلت: {user_message}",
                 "mode": "simulation"
             })
         
-        # إرسال الطلب إلى Groq
         headers = {
             "Authorization": f"Bearer {GROQ_API_KEY}",
             "Content-Type": "application/json"
@@ -469,7 +401,7 @@ def chat():
         payload = {
             "model": model,
             "messages": [
-                {"role": "system", "content": "أنت مساعد ذكي متعدد اللغات. تجيب بلغة السؤال (عربي/إنجليزي)."},
+                {"role": "system", "content": "أنت مساعد ذكي متعدد اللغات. تجيب بلغة السؤال."},
                 {"role": "user", "content": user_message}
             ],
             "temperature": 0.7,
@@ -478,21 +410,28 @@ def chat():
         
         response = requests.post(GROQ_API_URL, headers=headers, json=payload, timeout=60)
         
-        if response.status_code == 200:
-            result = response.json()
+        # ✅ معالجة أخطاء Groq بشكل أفضل
+        if response.status_code != 200:
+            error_detail = response.text
+            try:
+                error_json = response.json()
+                error_detail = error_json.get('error', {}).get('message', response.text)
+            except:
+                pass
+            
             return jsonify({
-                "response": result['choices'][0]['message']['content'],
-                "model": model,
-                "usage": result.get('usage', {})
-            })
-        else:
-            return jsonify({
-                "error": f"❌ خطأ من Groq: {response.status_code}",
-                "details": response.text
+                "error": f"❌ خطأ من Groq ({response.status_code}): {error_detail}"
             }), 500
+        
+        result = response.json()
+        return jsonify({
+            "response": result['choices'][0]['message']['content'],
+            "model": model,
+            "usage": result.get('usage', {})
+        })
             
     except Exception as e:
-        return jsonify({"error": f"❌ خطأ: {str(e)}"}), 500
+        return jsonify({"error": f"❌ خطأ داخلي: {str(e)}"}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
